@@ -1,0 +1,27 @@
+﻿{
+	"name": "プロキシサーバー",
+	"description": "プロキシhttp://127.0.0.1:80を作成",
+	"version": "0.1",
+	"permissions": [
+		"storage"
+	],
+		
+	"icons": {
+		"128": "icon/icon-128.png"
+	},
+			
+	"app": {
+		"background": {
+			"scripts": ["background.js"]
+		}
+	},
+		
+	"sockets": {
+		"tcp": {
+			"connect": "*"
+		},
+		"tcpServer": {
+			"listen": "127.0.0.1"
+		}
+	}
+}
