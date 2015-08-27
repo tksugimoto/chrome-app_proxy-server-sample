@@ -41,7 +41,7 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 			isRequestFromBrowser[socketId] = true;
 			var requestTextArray = arrayBuffer2string(info.data).split(MESSAGE_SEPARATOR);
 			var firstLine = requestTextArray[0];
-			if (firstLine.match(/^(GET|POST) (http:\/\/([^/]+)(\/[^ ]+)) (.*)$/i)) {
+			if (firstLine.match(/^(GET|POST) (http:\/\/([^/]+)(\/[^ ]*)) (.*)$/i)) {
 				var method = RegExp.$1;
 				var url = RegExp.$2;
 				var host = RegExp.$3;
