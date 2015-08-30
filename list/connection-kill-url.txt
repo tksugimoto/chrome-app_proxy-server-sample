@@ -1,0 +1,23 @@
+﻿# 
+# 接続を切断するURLリスト
+# 「#」で始まる行はコメント
+# デフォルト：前方一致
+#     http://www.example.com/
+# httpsはhost部分しか分からないのでパス部分は書いても無視
+#  注）host部分は完全一致（「https://www.example.」はNG）
+#     https://www.example.com/
+#     https://www.example.com/test ← test部分は消される
+# r:始まり：正規表現・前方一致
+# r:https?://[^/]+.example.com/
+
+# http前方一致
+http://www.google-analytics.com/ga.js
+
+# https前方一致
+https://ssl.google-analytics.com/ga.js
+
+# 正規表現
+r:http://www\.example\.com/[^.]+\.html
+
+# 完全一致（正規表現）
+r:http://www\.example\.com/$

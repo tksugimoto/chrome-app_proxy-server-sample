@@ -2,8 +2,8 @@
 	chrome.app.window.create("index.html", {
 		id: "-",
 		"bounds": {
-			"width":  200,
-			"height": 300,
+			"width":  800,
+			"height": 600,
 			"top":  0,
 			"left": 0
 		}

@@ -41,9 +41,14 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 			isRequestFromBrowser[socketId] = true;
 			var requestTextArray = arrayBuffer2string(info.data).split(MESSAGE_SEPARATOR);
 			var firstLine = requestTextArray[0];
-			if (firstLine.match(/^(GET|POST) (http:\/\/([^/]+)(\/[^ ]*)) (.*)$/i)) {
+			if (firstLine.match(/^(GET|POST|PUT|DELETE|HEAD|OPTIONS) (http:\/\/([^/]+)(\/[^ ]*)) (.*)$/i)) {
 				var method = RegExp.$1;
 				var url = RegExp.$2;
+				if (treeSetting.get("connection-kill") && isConnectionKillUrl(url, socketId)) {
+					responseKilledPage(socketId);
+					delete isRequestFromBrowser[socketId];
+					return;
+				}
 				var host = RegExp.$3;
 				var path = RegExp.$4;
 				var other = RegExp.$5;
@@ -53,6 +58,15 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 				requestToServer(socketId, host, arrayBuffer);
 			} else if (firstLine.match(/^CONNECT ([^ ]+) (.*)$/i)) {
 				var host = RegExp.$1;
+				if (treeSetting.get("connection-kill")) {
+					var url = "https://" + host.replace(/:\d+/, "") + "/";
+					if (isConnectionKillUrl(url, socketId)) {
+						// SSLで暗号化されているのでhttpレスポンスは返せない
+						chrome.sockets.tcp.close(socketId);
+						delete isRequestFromBrowser[socketId];
+						return;
+					}
+				}
 				var other = RegExp.$2;
 				console.log(socketId, "SSL CONNECT: ", host);
 				connectToServer(socketId, host);
@@ -216,5 +230,35 @@ function socketsInfo() {
 			, socketInfo.peerAddress + ":" + socketInfo.peerPort
 			, socketInfo);
 		});
+	});
+}
+
+function isConnectionKillUrl(url, socketId){
+	for (var i = 0, len = connectionKillList.length; i < len; i++) {
+		if (url.lastIndexOf(connectionKillList[i], 0) === 0) {
+			console.log(socketId, "Connection Killed: ", {
+				url: url,
+				rule: connectionKillList[i]
+			});
+			return true;
+		}
+	}
+	for (var i = 0, len = connectionKillList_regexp.length; i < len; i++) {
+		if (connectionKillList_regexp[i].test(url)) {
+			console.log(socketId, "Connection Killed: ", {
+				url: url,
+				rule: connectionKillList_regexp[i]
+			});
+			return true;
+		}
+	}
+	return false;
+}
+
+var killedPageResponseTextArray = ["HTTP/1.1 200 Connection established", "Connection: close", "", "Connection Killed"];
+var killedPageArrayBuffer = string2arrayBuffer(killedPageResponseTextArray.join(MESSAGE_SEPARATOR));
+function responseKilledPage(socketId){
+	chrome.sockets.tcp.send(socketId, killedPageArrayBuffer, function(info) {
+		chrome.sockets.tcp.close(socketId);
 	});
 }
