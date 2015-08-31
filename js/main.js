@@ -22,8 +22,22 @@ chrome.sockets.tcpServer.onAccept.addListener(function(info) {
 
 chrome.sockets.tcp.onReceive.addListener(function(info) {
 	var socketId = info.socketId;
-	if (isRequestFromServer[socketId]) {
-		// サーバー→ブラウザへのレスポンス
+	if (isResponseFromServer[socketId]) {
+		// サーバーからのレスポンス
+		if (isResponseFromSecondaryProxy[socketId]) {
+			// プロキシサーバーからのレスポンス（初回のみ）
+			var requestTextArray = arrayBuffer2string(info.data).split(MESSAGE_SEPARATOR);
+			if (requestTextArray[0] === "HTTP/1.1 200 Connection established") {
+				chrome.sockets.tcp.send(socketId, originalMessageToProxyServerFromBrowser[socketId], function(info) {
+					console.debug("プロキシサーバーへオリジナルメッセージ送信: ", socketId);
+				});
+			} else {
+				console.error("プロキシサーバーからのレスポンス", socketId, requestTextArray);
+			}
+			delete originalMessageToProxyServerFromBrowser[socketId];
+			delete isResponseFromSecondaryProxy[socketId];
+			return;
+		}
 		var socketIdToBrowser = socketIdMapServerResponse2Browser[socketId];
 		console.debug("サーバー→ブラウザ: ", socketId, "→", socketIdToBrowser);
 		chrome.sockets.tcp.send(socketIdToBrowser, info.data, function(info) {
@@ -43,25 +57,34 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 			if (firstLine.match(/^(GET|POST|PUT|DELETE|HEAD|OPTIONS) (http:\/\/([^/]+)(\/[^ ]*)) (.*)$/i)) {
 				var method = RegExp.$1;
 				var url = RegExp.$2;
+				var host = RegExp.$3;
+				var path = RegExp.$4;
+				var other = RegExp.$5;
 				if (treeSetting.get("connection-kill") && isConnectionKillUrl(url, socketId)) {
 					responseKilledPage(socketId);
 					return;
 				}
-				if (treeSetting.get("secondary-proxy")) {
-					var host_port = treeSetting.get("secondary-proxy.host")
-							 + ":" + treeSetting.get("secondary-proxy.port");
-					requestToServer(socketId, host_port, info.data);
-					return;
-				}
-				var host = RegExp.$3;
-				var path = RegExp.$4;
-				var other = RegExp.$5;
+				
 				console.log(socketId, "Request: ", url);
 				requestTextArray[0] = method + " " + path + " " + other;
 				var arrayBuffer = string2arrayBuffer(requestTextArray.join(MESSAGE_SEPARATOR));
+				
+				if (treeSetting.get("secondary-proxy")) {
+					if (treeSetting.get("secondary-proxy.always-connect-method")) {
+						var proxy_host = treeSetting.get("secondary-proxy.host");
+						var proxy_port = treeSetting.get("secondary-proxy.port");
+						connectToProxyServer(socketId, proxy_host, proxy_port, host, arrayBuffer);
+					} else {
+						var proxy_host_port = treeSetting.get("secondary-proxy.host")
+								 + ":" + treeSetting.get("secondary-proxy.port");
+						requestToServer(socketId, proxy_host_port, info.data);
+					}
+					return;
+				}
 				requestToServer(socketId, host, arrayBuffer);
 			} else if (firstLine.match(/^CONNECT ([^ ]+) (.*)$/i)) {
 				var host = RegExp.$1;
+				var other = RegExp.$2;
 				if (treeSetting.get("connection-kill")) {
 					var url = "https://" + host.replace(/:\d+/, "") + "/";
 					if (isConnectionKillUrl(url, socketId)) {
@@ -71,19 +94,18 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 					}
 				}
 				if (treeSetting.get("secondary-proxy")) {
-					var host_port = treeSetting.get("secondary-proxy.host")
+					var proxy_host_port = treeSetting.get("secondary-proxy.host")
 							 + ":" + treeSetting.get("secondary-proxy.port");
-					requestToServer(socketId, host_port, info.data);
+					requestToServer(socketId, proxy_host_port, info.data);
 					return;
 				}
-				var other = RegExp.$2;
 				console.log(socketId, "SSL CONNECT: ", host);
 				connectToServer(socketId, host);
 			} else {
 				if (treeSetting.get("secondary-proxy")) {
-					var host_port = treeSetting.get("secondary-proxy.host")
+					var proxy_host_port = treeSetting.get("secondary-proxy.host")
 							 + ":" + treeSetting.get("secondary-proxy.port");
-					requestToServer(socketId, host_port, info.data);
+					requestToServer(socketId, proxy_host_port, info.data);
 					return;
 				}
 				console.warn(socketId, "非対応プロトコル: ", requestTextArray)
@@ -103,11 +125,11 @@ chrome.sockets.tcp.onReceiveError.addListener(function(info) {
 	switch (info.resultCode) {
 		case NET_ERRORS.SOCKET_NOT_CONNECTED:
 		case NET_ERRORS.CONNECTION_CLOSED:
-			if (isRequestFromServer[socketId]) {
+			if (isResponseFromServer[socketId]) {
 				// サーバー→ブラウザ
 				var socketIdFromBrowser = socketIdMapServerResponse2Browser[socketId];
 				console.debug("通信終了（サーバー→ブラウザ）", socketId, socketIdFromBrowser);
-				delete isRequestFromServer[socketId];
+				delete isResponseFromServer[socketId];
 				delete socketIdMapServerResponse2Browser[socketId];
 				
 				var serverRequestsInfo = serverRequestsInfoMap[socketIdFromBrowser] || [];
@@ -152,7 +174,7 @@ chrome.sockets.tcp.onReceiveError.addListener(function(info) {
 });
 
 var isRequestFromBrowser = {};
-var isRequestFromServer = {};
+var isResponseFromServer = {};
 
 var socketIdMapServerResponse2Browser = {};
 var serverRequestsInfoMap = {};
@@ -177,7 +199,7 @@ function requestToServer(socketIdFromBrowser, host_port, arrayBuffer) {
 	var port = parseInt(temp[1] || 80);
 	chrome.sockets.tcp.create(function(createInfo) {
 		var socketId = createInfo.socketId;
-		isRequestFromServer[socketId] = true;
+		isResponseFromServer[socketId] = true;
 		socketIdMapServerResponse2Browser[socketId] = socketIdFromBrowser;
 		
 		if (!serverRequestsInfoMap[socketIdFromBrowser]) serverRequestsInfoMap[socketIdFromBrowser] = [];
@@ -207,7 +229,7 @@ function connectToServer(socketIdFromBrowser, host_port) {
 	var port = parseInt(temp[1] || 80);
 	chrome.sockets.tcp.create(function(createInfo) {
 		var socketId = createInfo.socketId;
-		isRequestFromServer[socketId] = true;
+		isResponseFromServer[socketId] = true;
 		socketIdMapServerResponse2Browser[socketId] = socketIdFromBrowser;
 		
 		isSslRequestFromBrowser[socketIdFromBrowser] = true;
@@ -221,6 +243,40 @@ function connectToServer(socketIdFromBrowser, host_port) {
 				var arrayBuffer = string2arrayBuffer(responseTextArray.join(MESSAGE_SEPARATOR));
 				chrome.sockets.tcp.send(socketIdFromBrowser, arrayBuffer, function(info) {
 					console.debug(socketId, "プロキシ→ブラウザ: コネクション確立", host_port);
+				});
+			}
+		});
+	});
+}
+
+var isResponseFromSecondaryProxy = {};
+var originalMessageToProxyServerFromBrowser = {};
+function connectToProxyServer(socketIdFromBrowser, proxy_host, proxy_port, original_host, originalMessage) {
+	chrome.sockets.tcp.create(function(createInfo) {
+		var socketId = createInfo.socketId;
+			
+		chrome.sockets.tcp.connect(socketId, proxy_host, proxy_port, function(result) {
+			if (result < 0) {
+				console.warn("chrome.sockets.tcp.connectエラー: ", result, proxy_host, proxy_port);
+			} else {
+				isResponseFromServer[socketId] = true;
+				isResponseFromSecondaryProxy[socketId] = true;
+				socketIdMapServerResponse2Browser[socketId] = socketIdFromBrowser;
+				originalMessageToProxyServerFromBrowser[socketId] = originalMessage;
+		
+				var temp =original_host.split(":");
+				var host = temp[0];
+				var port = temp[1] || 80;
+				var responseTextArray = [
+					"CONNECT " + host + ":" + port + " HTTP/1.1",
+					"Host: " + host,
+					"Proxy-Connection: keep-alive",
+					"",
+					""
+				];
+				var arrayBuffer = string2arrayBuffer(responseTextArray.join(MESSAGE_SEPARATOR));
+				chrome.sockets.tcp.send(socketId, arrayBuffer, function(info) {
+					console.debug("ブラウザ→プロキシサーバー: ", proxy_host, proxy_port, ": ", socketIdFromBrowser, "→", socketId, responseTextArray);
 				});
 			}
 		});

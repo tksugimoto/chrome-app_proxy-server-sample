@@ -16,6 +16,9 @@ var treeSetting = new TreeSetting([{
 		name: "プロキシサーバーのポート",
 		type: "number",
 		defaultValue: 8080
+	}, {
+		key: "always-connect-method",
+		name: "すべて「CONNECT」でトンネルさせる"
 	}]
 }]);
 
