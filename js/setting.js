@@ -3,6 +3,20 @@
 var treeSetting = new TreeSetting([{
 	key: "connection-kill",
 	name: "接続を切断する機能"
+}, {
+	key: "secondary-proxy",
+	name: "別のプロキシへ転送",
+	child: [{
+		key: "host",
+		name: "プロキシサーバーのホスト",
+		type: "text",
+		defaultValue: "127.0.0.1"
+	}, {
+		key: "port",
+		name: "プロキシサーバーのポート",
+		type: "number",
+		defaultValue: 8080
+	}]
 }]);
 
 treeSetting.ready(function (){

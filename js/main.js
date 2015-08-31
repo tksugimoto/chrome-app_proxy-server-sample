@@ -38,7 +38,6 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 				
 			});
 		} else {
-			isRequestFromBrowser[socketId] = true;
 			var requestTextArray = arrayBuffer2string(info.data).split(MESSAGE_SEPARATOR);
 			var firstLine = requestTextArray[0];
 			if (firstLine.match(/^(GET|POST|PUT|DELETE|HEAD|OPTIONS) (http:\/\/([^/]+)(\/[^ ]*)) (.*)$/i)) {
@@ -46,7 +45,12 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 				var url = RegExp.$2;
 				if (treeSetting.get("connection-kill") && isConnectionKillUrl(url, socketId)) {
 					responseKilledPage(socketId);
-					delete isRequestFromBrowser[socketId];
+					return;
+				}
+				if (treeSetting.get("secondary-proxy")) {
+					var host_port = treeSetting.get("secondary-proxy.host")
+							 + ":" + treeSetting.get("secondary-proxy.port");
+					requestToServer(socketId, host_port, info.data);
 					return;
 				}
 				var host = RegExp.$3;
@@ -63,16 +67,28 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 					if (isConnectionKillUrl(url, socketId)) {
 						// SSLで暗号化されているのでhttpレスポンスは返せない
 						chrome.sockets.tcp.close(socketId);
-						delete isRequestFromBrowser[socketId];
 						return;
 					}
+				}
+				if (treeSetting.get("secondary-proxy")) {
+					var host_port = treeSetting.get("secondary-proxy.host")
+							 + ":" + treeSetting.get("secondary-proxy.port");
+					requestToServer(socketId, host_port, info.data);
+					return;
 				}
 				var other = RegExp.$2;
 				console.log(socketId, "SSL CONNECT: ", host);
 				connectToServer(socketId, host);
 			} else {
+				if (treeSetting.get("secondary-proxy")) {
+					var host_port = treeSetting.get("secondary-proxy.host")
+							 + ":" + treeSetting.get("secondary-proxy.port");
+					requestToServer(socketId, host_port, info.data);
+					return;
+				}
 				console.warn(socketId, "非対応プロトコル: ", requestTextArray)
 			}
+			isRequestFromBrowser[socketId] = true;
 		}
 	}
 });
