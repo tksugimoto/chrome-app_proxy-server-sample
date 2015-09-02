@@ -27,7 +27,8 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 		if (isResponseFromSecondaryProxy[socketId]) {
 			// プロキシサーバーからのレスポンス（初回のみ）
 			var requestTextArray = arrayBuffer2string(info.data).split(MESSAGE_SEPARATOR);
-			if (requestTextArray[0] === "HTTP/1.1 200 Connection established") {
+			if (requestTextArray[0] === "HTTP/1.1 200 Connection established"
+			|| requestTextArray[0] === "HTTP/1.0 200 Connection established") {
 				chrome.sockets.tcp.send(socketId, originalMessageToProxyServerFromBrowser[socketId], function(info) {
 					console.debug("プロキシサーバーへオリジナルメッセージ送信: ", socketId);
 				});
