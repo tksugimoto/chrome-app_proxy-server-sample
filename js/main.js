@@ -66,6 +66,10 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 					return;
 				}
 				
+				if (treeSetting.get("no-dns") && isNoDnsHost(host, socketId)) {
+					host = resolveHost(host);
+				}
+				
 				console.log(socketId, "Request: ", url);
 				requestTextArray[0] = method + " " + path + " " + other;
 				var arrayBuffer = string2arrayBuffer(requestTextArray.join(MESSAGE_SEPARATOR));
@@ -94,6 +98,13 @@ chrome.sockets.tcp.onReceive.addListener(function(info) {
 						return;
 					}
 				}
+				
+				if (treeSetting.get("no-dns") && isNoDnsHost(host, socketId)) {
+					host = resolveHost(host);
+					requestTextArray[0] = "CONNECT " + host + " " + other;
+					info.data = string2arrayBuffer(requestTextArray.join(MESSAGE_SEPARATOR));
+				}
+				
 				if (treeSetting.get("secondary-proxy")) {
 					var proxy_host_port = treeSetting.get("secondary-proxy.host")
 							 + ":" + treeSetting.get("secondary-proxy.port");
@@ -326,6 +337,27 @@ function isConnectionKillUrl(url, socketId){
 		}
 	}
 	return false;
+}
+
+function isNoDnsHost(host, socketId){
+	var temp = host.split(":");
+	host = temp[0];
+	var port = temp[1];
+	if (host in HostIpPair) {
+		console.log(socketId, "No DNS: ", {
+			host: host,
+			ip: HostIpPair[host]
+		});
+		return true;
+	}
+	return false;
+}
+
+function resolveHost(host) {
+	var temp = host.split(":");
+	host = temp[0];
+	var port = temp[1];
+	return HostIpPair[host] + ":" + port;
 }
 
 var killedPageResponseTextArray = ["HTTP/1.1 200 Connection established", "Connection: close", "", "Connection Killed"];
