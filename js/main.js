@@ -356,7 +356,7 @@ function isNoDnsHost(host, socketId){
 function resolveHost(host) {
 	var temp = host.split(":");
 	host = temp[0];
-	var port = temp[1];
+	var port = temp[1] || 80;
 	return HostIpPair[host] + ":" + port;
 }
 
