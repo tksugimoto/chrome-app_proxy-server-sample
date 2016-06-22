@@ -1,4 +1,5 @@
 ﻿chrome.app.runtime.onLaunched.addListener(launch);
+chrome.runtime.onStartup.addListener(launch);
 
 function launch() {
 	chrome.app.window.create("index.html", {
