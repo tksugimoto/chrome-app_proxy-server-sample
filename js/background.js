@@ -1,4 +1,6 @@
-﻿chrome.app.runtime.onLaunched.addListener(function(launchData) {
+﻿chrome.app.runtime.onLaunched.addListener(launch);
+
+function launch() {
 	chrome.app.window.create("index.html", {
 		id: "-",
 		"bounds": {
@@ -8,4 +10,4 @@
 			"left": 0
 		}
 	});
-});
+}
