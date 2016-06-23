@@ -281,7 +281,6 @@ function connectToProxyServer(socketIdFromBrowser, proxy_host, proxy_port, origi
 				var port = temp[1] || 80;
 				var responseTextArray = [
 					"CONNECT " + host + ":" + port + " HTTP/1.1",
-					"Host: " + host,
 					"Proxy-Connection: keep-alive",
 					"",
 					""
