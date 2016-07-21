@@ -4,6 +4,9 @@ var host = "127.0.0.1";
 var port = 80;
 var MESSAGE_SEPARATOR = "\r\n";
 
+document.getElementById("host").value = host;
+document.getElementById("port").value = port;
+
 chrome.sockets.tcpServer.create(function(createInfo) {
 	console.log("chrome.sockets.tcpServer.create", createInfo);
 	tcpServerSocketId = createInfo.socketId;
