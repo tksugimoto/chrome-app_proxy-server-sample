@@ -1,7 +1,7 @@
 ﻿
 var tcpServerSocketId;
 var host = "127.0.0.9";
-var port = 8080;
+var port = 18080;
 var MESSAGE_SEPARATOR = "\r\n";
 
 document.getElementById("host").value = host;

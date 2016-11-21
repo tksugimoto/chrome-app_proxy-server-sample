@@ -1,6 +1,6 @@
 ﻿{
 	"name": "プロキシサーバー",
-	"description": "プロキシhttp://127.0.0.9:8080を作成",
+	"description": "プロキシhttp://127.0.0.9:18080を作成",
 	"version": "0.1",
 	"permissions": [
 		"storage"
@@ -21,7 +21,7 @@
 			"connect": "*"
 		},
 		"tcpServer": {
-			"listen": "127.0.0.9:8080"
+			"listen": "127.0.0.9:18080"
 		}
 	}
 }
